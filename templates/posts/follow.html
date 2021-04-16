@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Последние обновления на сайте{% endblock %}
+{% block header %}{% endblock %}
+{% block content %}
+{% load cache %}
+<div class="container">
+
+    {% include "menu.html" with follow=True %}
+
+        <h1>Последние обновления на сайте</h1>
+        {% cache 20 follow_page page.number %}
+            <!-- Вывод ленты записей -->
+            {% for post in page %}
+                {% include "post_item.html" with post=post %}
+            {% endfor %}
+        {% endcache %}
+
+    {% if page.has_other_pages %}
+        {% include "paginator.html" with items=page paginator=paginator%}
+    {% endif %}
+
+</div>
+{% endblock %} 
