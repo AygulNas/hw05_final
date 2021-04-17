@@ -95,6 +95,11 @@ class PostPagesTests(TestCase):
         self.authorized_client = Client()
         self.authorized_client.force_login(self.user)
 
+    def get_first_context_for_authorized_client(self, request, field):
+        response = self.authorized_client.get(request)
+        first_object = response.context[field][0]
+        return first_object
+
     def test_pages_used_correced_template(self):
         """Страницы используют нужные шаблоны"""
         template_pages_names = {
@@ -115,7 +120,7 @@ class PostPagesTests(TestCase):
                 response = self.authorized_client.get(reverse_name)
                 self.assertTemplateUsed(response, template)
 
-    def test_task_list_page_list(self):
+    def test_mail_pages_have_correct_count_posts(self):
         """Index и Follow имеет правильно количество постов"""
         count_posts = {
             reverse('index'): 3,
@@ -128,8 +133,10 @@ class PostPagesTests(TestCase):
 
     def test_index_page_shows_correct_context(self):
         """Index правильно заполняется данными"""
-        response = self.authorized_client.get(reverse('index'))
-        first_object = response.context['page'][0]
+        first_object = self.get_first_context_for_authorized_client(
+            reverse('index'),
+            'page'
+        )
         post_data_all = {
             first_object.text: 'test_another_post',
             first_object.pub_date.date(): datetime.datetime.now().date(),
@@ -143,8 +150,10 @@ class PostPagesTests(TestCase):
 
     def test_follow_index_page_show_correct_context(self):
         """Follow_Index правильно заполняется данными"""
-        response = self.authorized_client.get(reverse('follow_index'))
-        first_object = response.context['page'][0]
+        first_object = self.get_first_context_for_authorized_client(
+            reverse('follow_index'),
+            'page'
+        )
         post_data_all = {
             first_object.text: 'test_follower_post',
             first_object.pub_date.date(): datetime.datetime.now().date(),
@@ -158,25 +167,30 @@ class PostPagesTests(TestCase):
 
     def test_follow_page_dont_show_unfollowing(self):
         """Follow не показывает пост не подписанного автора"""
-        response = self.authorized_client.get(reverse('follow_index'))
-        self.assertNotEqual(response.context['page'][0].text,
+        first_object = self.get_first_context_for_authorized_client(
+            reverse('follow_index'),
+            'page'
+        )
+        self.assertNotEqual(first_object.text,
                             'test_another_post')
-        self.assertNotEqual(response.context['page'][0].author.username,
+        self.assertNotEqual(first_object.author.username,
                             'test_another_user')
-        self.assertNotEqual(response.context['page'][0].group.title,
+        self.assertNotEqual(first_object.group.title,
                             'test_another_group')
 
     def test_group_pages_show_correct_context(self):
         """Пост попадает в нужную группу"""
         date_today = datetime.datetime.now().date()
-        response = self.authorized_client.get(
-            reverse('group', kwargs={'slug': 'test_group'}))
+        first_object = self.get_first_context_for_authorized_client(
+            reverse('group', kwargs={'slug': 'test_group'}),
+            'page'
+        )
         post_data_all = {
-            response.context['page'][0].text: 'test_post',
-            response.context['page'][0].pub_date.date(): date_today,
-            response.context['page'][0].author.username: 'test_user',
-            response.context['page'][0].group.title: 'test_group',
-            response.context['page'][0].image: 'posts/small.gif',
+            first_object.text: 'test_post',
+            first_object.pub_date.date(): date_today,
+            first_object.author.username: 'test_user',
+            first_object.group.title: 'test_group',
+            first_object.image: 'posts/small.gif',
         }
         for post_data, expect in post_data_all.items():
             with self.subTest(post_data=post_data):
@@ -184,10 +198,12 @@ class PostPagesTests(TestCase):
 
     def test_another_group_pages_dont_show_context(self):
         """Пост не попадает в другую группу"""
-        response = self.authorized_client.get(
-            reverse('group', kwargs={'slug': 'test_another_group'}))
-        self.assertNotEqual(response.context['page'][0].text, 'test_post')
-        self.assertNotEqual(response.context['page'][0].group.title,
+        first_object = self.get_first_context_for_authorized_client(
+            reverse('group', kwargs={'slug': 'test_another_group'}),
+            'page'
+        )
+        self.assertNotEqual(first_object.text, 'test_post')
+        self.assertNotEqual(first_object.group.title,
                             'test_group')
 
     def test_post_pages_show_correct_context(self):
@@ -195,12 +211,13 @@ class PostPagesTests(TestCase):
         date_today = datetime.datetime.now().date()
         response = self.authorized_client.get(
             reverse('post', kwargs={'username': 'test_user', 'post_id': 1}))
+        post_object = response.context['post']
         post_data_all = {
-            response.context['post'].text: 'test_post',
-            response.context['post'].pub_date.date(): date_today,
-            response.context['post'].author.username: 'test_user',
-            response.context['post'].group.title: 'test_group',
-            response.context['post'].image: 'posts/small.gif',
+            post_object.text: 'test_post',
+            post_object.pub_date.date(): date_today,
+            post_object.author.username: 'test_user',
+            post_object.group.title: 'test_group',
+            post_object.image: 'posts/small.gif',
         }
         for post_data, expect in post_data_all.items():
             with self.subTest(post_data=post_data):
@@ -209,14 +226,16 @@ class PostPagesTests(TestCase):
     def test_user_pages_show_correct_context(self):
         """Пост попадает на страницу пользователя"""
         date_today = datetime.datetime.now().date()
-        response = self.authorized_client.get(
-            reverse('profile', kwargs={'username': 'test_user'}))
+        first_object = self.get_first_context_for_authorized_client(
+            reverse('profile', kwargs={'username': 'test_user'}),
+            'page'
+        )
         post_data_all = {
-            response.context['page'][0].text: 'test_post',
-            response.context['page'][0].pub_date.date(): date_today,
-            response.context['page'][0].author.username: 'test_user',
-            response.context['page'][0].group.title: 'test_group',
-            response.context['page'][0].image: 'posts/small.gif',
+            first_object.text: 'test_post',
+            first_object.pub_date.date(): date_today,
+            first_object.author.username: 'test_user',
+            first_object.group.title: 'test_group',
+            first_object.image: 'posts/small.gif',
         }
         for post_data, expect in post_data_all.items():
             with self.subTest(post_data=post_data):
@@ -224,10 +243,12 @@ class PostPagesTests(TestCase):
 
     def test_another_user_pages_dont_show_context(self):
         """Пост не попадает на страницу другого пользователя"""
-        response = self.authorized_client.get(
-            reverse('profile', kwargs={'username': 'test_another_user'}))
-        self.assertNotEqual(response.context['page'][0].text, 'test_post')
-        self.assertNotEqual(response.context['page'][0].group.title,
+        first_object = self.get_first_context_for_authorized_client(
+            reverse('profile', kwargs={'username': 'test_another_user'}),
+            'page'
+        )
+        self.assertNotEqual(first_object.text, 'test_post')
+        self.assertNotEqual(first_object.group.title,
                             'test_group')
 
     def test_new_post_shows_correct_form(self):
@@ -256,6 +277,32 @@ class PostPagesTests(TestCase):
             with self.subTest(value=value):
                 form_field = response.context['form'].fields[value]
                 self.assertIsInstance(form_field, expected)
+
+    def test_post_cant_load_no_picture(self):
+        text = ('Try load text file instead picture').encode()
+        uploaded = SimpleUploadedFile(
+            name='text.txt',
+            content=text,
+            content_type='text/plain'
+        )
+        post_data = {
+            'group': Group.objects.get(title='test_group'),
+            'text': 'testing text',
+            'image': uploaded,
+        }
+        response = self.authorized_client.post(
+            reverse('new_post'),
+            data=post_data,
+            follow=True
+        )
+        self.assertFormError(
+            response,
+            'form',
+            'image',
+            'Загрузите правильное изображение. '
+            'Файл, который вы загрузили, '
+            'поврежден или не является изображением.',
+        )
 
     def test_add_follower(self):
         author = self.another_user
